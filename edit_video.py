@@ -31,7 +31,14 @@ class Viktor:
         if not self.sample_rate:
             self.find_peak_audio_amplitude()
 
-        self.info (f'Adding additional audio (from {audio_file}) starting at: {insert_at} seconds')
+        insert_file_peak_audio,_ = find_peak(audio_file)
+        self.info (f'Found audio peak for {audio_file} at: {insert_file_peak_audio} seconds')
+        insert_at = self.peak_audio - insert_file_peak_audio
+
+        if replace_original_audio:
+            self.info (f'Replacing audio (for {self.video_file}) starting at: {insert_at} seconds with audio from {audio_file}')
+        else:
+            self.info (f'Adding additional audio track ({audio_file}) to video {self.video_file}')
         audioclip1 = AudioFileClip(audio_file,fps=self.sample_rate)
         # audioclip1.preview()
 
@@ -78,14 +85,14 @@ class Viktor:
         logger.info(f'{self.__class__.__name__}: {msg}')
 
 def main():
-    video_file = 'htonk.mov'
+    video_file = 'htw.mov'
 
     vik = Viktor(video_file)
     peak_audio_point,sample_rate = vik.find_peak_audio_amplitude ()
 
-    vik.add_audio_track ('htonk.wav',peak_audio_point)
-    vik.add_text_overlay('Martin the Rolling Stone',4,10)
-    vik.render_video_to('coolio.mp4')
+    vik.add_audio_track ('htw.wav',peak_audio_point)
+    vik.add_text_overlay('Spire movie',4,10)
+    vik.render_video_to('spire.mp4')
 
 
 if __name__ == '__main__':
