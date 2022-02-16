@@ -3,19 +3,31 @@
 # Import everything needed to edit video clips
 from moviepy.editor import *
 from setup_logger import *
+from sound_library import *
+import tempfile
 
 def main():
-    # Load myHolidays.mp4 and select the subclip 00:00:50 - 00:00:60
-    clip = VideoFileClip("htonk.mov")
+    video_file = 'htonk.mov'
+    add_audio = 'htonk.wav'
+    # Load video
+    clip = VideoFileClip(video_file)
 
-    audioclip1 = AudioFileClip("htonk.wav",fps=48000)
+    tf = tempfile.NamedTemporaryFile(suffix='.wav')
+    logger.info (f'Extracting audio track for Movie {video_file} into {tf.name}')
+    clip.audio.write_audiofile(tf.name)
+
+    peak_audio,sample_rate = find_peak (tf.name)
+    logger.info (f'Found audio peak at {peak_audio}')
+
+    audioclip1 = AudioFileClip(add_audio,fps=sample_rate)
     # Plays the audip
     # audioclip1.preview()
 
     # To add audio only way seems to be to assign a CompositeAudioClip
     #  to clip.audio.
     # So original track has to be explicitly part of that !! i.e clip.audio
-    new_audioclip = CompositeAudioClip([audioclip1,clip.audio])
+    # new_audioclip = CompositeAudioClip([audioclip1.set_start(peak_audio),clip.audio])
+    new_audioclip = CompositeAudioClip([audioclip1.set_start(peak_audio)])
 
     # Reduce the audio volume (volume x 1.8)
     # clip = clip.volumex(1.2)

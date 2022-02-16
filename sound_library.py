@@ -11,19 +11,26 @@ import numpy
 # Audio stats:  soxi martin1.wav
 # Spectogram:   sox martin1.wav -n spectogram -o martin1.png
 
-def main():
-    file = 'martin1.wav'
-    sample_rate = sox.file_info.sample_rate (file)
+def find_peak(audio_file):
+    sample_rate = sox.file_info.sample_rate (audio_file)
     logger.info (f'Sample rate: {sample_rate}')
-    signal, _ = librosa.load(file,sr=int(sample_rate))
+    signal, _ = librosa.load(audio_file,sr=int(sample_rate))
     # print (numpy.ndarray.max(signal))
 
+    peak = None
+    maxval = max(signal)
     for ndx in range (0,len(signal)):
-        if signal[ndx] >= 1.0:
+        if signal[ndx] >= maxval:
             # print (f'{ndx}: {signal[ndx]}')
-            logger.info (f'Peak is at approx {round(ndx/sample_rate,4)} seconds')
-            break
+            peak = round(ndx/sample_rate,4)
+            return peak,sample_rate
+    return 0.0,sample_rate
 
+
+def main():
+    peak = find_peak('martin1.wav')
+
+    logger.info (f'Peak is at approx {peak} seconds')
 
 if __name__ == '__main__':
     main()
