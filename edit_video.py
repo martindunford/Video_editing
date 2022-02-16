@@ -14,6 +14,7 @@ class Viktor:
         self.video_file = video_file
         self.complete_clip = VideoFileClip(self.video_file)
         self.original_audio = self.complete_clip.audio
+        self.all_video_clips = [self.complete_clip]
 
     # --------------------
     def find_peak_audio_amplitude(self):
@@ -61,6 +62,7 @@ class Viktor:
 
     # --------------------
     def add_text_overlay (self, mytext, insert_at, duration, font_size=70, mycolor='white'):
+        # Animation, See: https://towardsdatascience.com/rendering-text-on-video-using-python-1c006519c0aa
         self.info (f'Adding text overlay at {insert_at} secs to be displayed for: {duration} secs ')
         # Generate a text clip. You can customize the font, color, etc.
         txt_clip = TextClip(mytext,fontsize=font_size,color=mycolor)
@@ -69,13 +71,14 @@ class Viktor:
         txt_clip = txt_clip.set_pos('center').set_duration(duration)
 
         # Overlay the text clip on the first video clip
-        self.all_video_clips = CompositeVideoClip([self.complete_clip, txt_clip])
+        self.all_video_clips.append (txt_clip.set_start(insert_at))
+        self.video = CompositeVideoClip(self.all_video_clips)
 
     # --------------------
     def render_video_to (self, output_file):
         self.info (f'Rendering to: {output_file}')
         # Write the result to a file (many options available !)
-        self.all_video_clips.write_videofile(
+        self.video.write_videofile(
             output_file,
             audio_codec='aac' # Should not be needed but there is bug.
         )
@@ -91,7 +94,8 @@ def main():
     peak_audio_point,sample_rate = vik.find_peak_audio_amplitude ()
 
     vik.add_audio_track ('htw.wav',peak_audio_point)
-    vik.add_text_overlay('Spire movie',4,10)
+    vik.add_text_overlay('Recorded live in Kinvara',2,7)
+    vik.add_text_overlay('Martin Dunford does the Rolling Stones!',10,20, font_size=30,mycolor='yellow')
     vik.render_video_to('spire.mp4')
 
 

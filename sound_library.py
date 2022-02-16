@@ -11,15 +11,19 @@ import numpy
 # Audio stats:  soxi martin1.wav
 # Spectogram:   sox martin1.wav -n spectogram -o martin1.png
 
-def find_peak(audio_file):
+def find_peak(audio_file,look_in_initial_period=10):
     sample_rate = sox.file_info.sample_rate (audio_file)
     logger.info (f'Sample rate: {sample_rate}')
     signal, _ = librosa.load(audio_file,sr=int(sample_rate))
     # print (numpy.ndarray.max(signal))
 
     peak = None
-    maxval = max(signal)
-    for ndx in range (0,len(signal)):
+    search_initial_samples = look_in_initial_period*int(sample_rate)
+    maxval = max(signal[:search_initial_samples])
+
+    # Looks for peak amplitude in initial smaples e.g a  hand clap before starting to play music  !!
+    # otherwise part of recording might exceed it !!
+    for ndx in range (0,search_initial_samples):
         if signal[ndx] >= maxval:
             # print (f'{ndx}: {signal[ndx]}')
             peak = round(ndx/sample_rate,4)
