@@ -13,8 +13,10 @@ class Viktor:
     def __init__ (self,video_file):
         self.video_file = video_file
         self.complete_clip = VideoFileClip(self.video_file)
+        logger.info (f'Original Clip size is: {self.complete_clip.size}')
         self.original_audio = self.complete_clip.audio
         self.all_video_clips = [self.complete_clip]
+        self.video = CompositeVideoClip(self.all_video_clips)
 
     # --------------------
     def find_peak_audio_amplitude(self):
@@ -61,14 +63,14 @@ class Viktor:
         # clip = clip.volumex(1.2)
 
     # --------------------
-    def add_text_overlay (self, mytext, insert_at, duration, font_size=70, mycolor='white'):
+    def add_text_overlay (self, mytext, insert_at, duration, font_size=70, mycolor='white',position='center'):
         # Animation, See: https://towardsdatascience.com/rendering-text-on-video-using-python-1c006519c0aa
         self.info (f'Adding text overlay at {insert_at} secs to be displayed for: {duration} secs ')
         # Generate a text clip. You can customize the font, color, etc.
         txt_clip = TextClip(mytext,fontsize=font_size,color=mycolor)
 
         # Say that you want it to appear 10s at the center of the screen
-        txt_clip = txt_clip.set_pos('center').set_duration(duration)
+        txt_clip = txt_clip.set_pos(position).set_duration(duration)
 
         # Overlay the text clip on the first video clip
         self.all_video_clips.append (txt_clip.set_start(insert_at))
@@ -87,17 +89,118 @@ class Viktor:
     def info(self, msg):
         logger.info(f'{self.__class__.__name__}: {msg}')
 
+import cv2
+import numpy as np
+
+def replace_green():
+    video = cv2.VideoCapture("Rolling.mov")
+    image = cv2.imread("Burren-Limestone.jpg")
+    image = cv2.resize (image,(1280, 1080))
+
+    while True:
+        ret, frame = video.read()
+
+        frame = cv2.resize(frame, (1280, 1080))
+
+        # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
+        u_green = np.array([200, 248, 70])
+        l_green = np.array([30, 50, 0])
+
+        mask = cv2.inRange(frame, l_green, u_green)
+        # mask = create_mask_with_threshold(frame)
+        res = cv2.bitwise_and(frame, frame, mask = mask)
+
+        f = frame - res
+        f = np.where(f == 0, image, f)
+        cv2.imshow("video", frame)
+        cv2.imshow("mask", f)
+
+        if cv2.waitKey(25) == 27:
+            break
+
+    video.release()
+    cv2.destroyAllWindows()
+
+def create_mask_with_threshold(frame):
+    # split the the B, G and R channels
+    b, g, r = cv2.split(frame)
+
+    # create the threshold
+    _, mask = cv2.threshold(g, 200, 50, cv2.THRESH_BINARY_INV)
+
+    # De-noise the threshold to get a cleaner mask
+    mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)))
+
+    return mask
+
+
+def replace_background(frame, bg, mask):
+    # if the pixel on threshold is background then make it white
+    frame[mask == 0] = 255
+
+    # if the pixel on threshold is not background then make it black
+    bg[mask != 0] = 255
+
+    # combine both images into frame
+    return cv2.bitwise_and(bg, frame)
+
+def wip1():
+    replace_green()
+
+def wip2():
+    image = cv2.imread("Burren-Limestone.jpg")
+
+    image = cv2.resize(image, (1280, 1080))
+    cv2.imshow("video", image)
+
+    while 1:
+        if cv2.waitKey(25) == 27:
+            break
+
+def wip3():
+    video = cv2.VideoCapture("Rolling.mov")
+    image = cv2.imread("Burren-Limestone.jpg")
+
+    ret, frame = video.read()
+
+    frame = cv2.resize(frame, (1280, 1080))
+    image = cv2.resize(image, (1280, 1080))
+
+
+    # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
+    u_green = np.array([200, 248, 70])
+    l_green = np.array([30, 70, 0])
+
+    mask = cv2.inRange(frame, l_green, u_green)
+    # mask = create_mask_with_threshold(frame)
+    res = cv2.bitwise_and(frame, frame, mask = mask)
+
+    f = frame - res
+    f = np.where(f == 0, image, f)
+
+    cv2.imshow("video", frame)
+    cv2.imshow("mask", f)
+
+    while 1:
+        if cv2.waitKey(25) == 27:
+            break
+
 def main():
-    video_file = 'htw.mov'
+    video_file = 'Rolling.mov'
 
     vik = Viktor(video_file)
     peak_audio_point,sample_rate = vik.find_peak_audio_amplitude ()
 
-    vik.add_audio_track ('htw.wav',peak_audio_point)
-    vik.add_text_overlay('Recorded live in Kinvara',2,7)
-    vik.add_text_overlay('Martin Dunford does the Rolling Stones!',10,20, font_size=30,mycolor='yellow')
-    vik.render_video_to('spire.mp4')
+    vik.add_audio_track ('Rolling.wav',peak_audio_point)
+    vik.add_text_overlay('Rolling - JJ Cale',2,30, position='top')
+    vik.add_text_overlay('Recorded Feb 17, 22 using Tascam 12!',2,10, font_size=30,mycolor='yellow')
+    vik.render_video_to('Rolling.mp4')
+
+    # For iPhone vide with size 1920x1080 following needed to get correct aspect ratio
+    os.system ('ffmpeg -i Rolling.mp4 -c copy -aspect 9:16 Rolling2.mp4')
+
+    # https://www.geeksforgeeks.org/replace-green-screen-using-opencv-python/
 
 
 if __name__ == '__main__':
-    main()
+    wip1()
