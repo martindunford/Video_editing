@@ -5,6 +5,8 @@ from moviepy.editor import *
 from setup_logger import *
 from sound_library import *
 import tempfile
+import time
+
 
 class Viktor:
     ''' Viktor the video manipulator
@@ -76,6 +78,18 @@ class Viktor:
         self.all_video_clips.append (txt_clip.set_start(insert_at))
         self.video = CompositeVideoClip(self.all_video_clips)
 
+    # ----------------------
+    # https://github.com/Zulko/moviepy/issues/964 (Am using this)
+    # https://www.geeksforgeeks.org/replace-green-screen-using-opencv-python/
+
+    def replace_green_screen_with_bkg_image(self,bkgimage_file):
+        self.info (f'Replacing Green Screen with: {bkgimage_file}')
+        background = ImageClip (bkgimage_file)
+        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=150, s=5)
+        self.all_video_clips.remove (self.complete_clip)
+        self.all_video_clips.append (background)
+        self.all_video_clips.append (masked_clip)
+
     # --------------------
     def render_video_to (self, output_file):
         self.info (f'Rendering to: {output_file}')
@@ -93,6 +107,7 @@ import cv2
 import numpy as np
 
 def replace_green():
+    ofile = cv2.VideoWriter('outpy.mp4',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (1280,1080))
     video = cv2.VideoCapture("Rolling.mov")
     image = cv2.imread("Burren-Limestone.jpg")
     image = cv2.resize (image,(1280, 1080))
@@ -100,22 +115,29 @@ def replace_green():
     while True:
         ret, frame = video.read()
 
-        frame = cv2.resize(frame, (1280, 1080))
+        if ret:
+            frame = cv2.resize(frame, (1280, 1080))
 
-        # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
-        u_green = np.array([200, 248, 70])
-        l_green = np.array([30, 50, 0])
+            # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
+            u_green = np.array([200, 248, 80])
+            l_green = np.array([30, 50, 0])
 
-        mask = cv2.inRange(frame, l_green, u_green)
-        # mask = create_mask_with_threshold(frame)
-        res = cv2.bitwise_and(frame, frame, mask = mask)
+            mask = cv2.inRange(frame, l_green, u_green)
+            # mask = create_mask_with_threshold(frame)
+            res = cv2.bitwise_and(frame, frame, mask = mask)
 
-        f = frame - res
-        f = np.where(f == 0, image, f)
-        cv2.imshow("video", frame)
-        cv2.imshow("mask", f)
+            f = frame - res
+            f = np.where(f == 0, image, f)
+            # cv2.imshow("video", frame)
+            # cv2.imshow("mask", f)
 
-        if cv2.waitKey(25) == 27:
+            ofile.write(f)
+
+            # Press Q on keyboard to stop processing
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        else:
+            # Last frame read
             break
 
     video.release()
@@ -186,21 +208,28 @@ def wip3():
             break
 
 def main():
-    video_file = 'Rolling.mov'
+    # Assumes replace audio is in <fname>.wav
+    moviename = 'test1'
 
+    video_file = f'{moviename}.mov'
+    audiofile = f'{moviename}.wav'
+    bkg_image = 'Burren-Limestone.jpg'
+    outputfile = f'{moviename}.mp4'
+    os.system(f'rm -f {temp.mp4} {outputfile}')
+
+    # ________________________
     vik = Viktor(video_file)
     peak_audio_point,sample_rate = vik.find_peak_audio_amplitude ()
 
-    vik.add_audio_track ('Rolling.wav',peak_audio_point)
-    vik.add_text_overlay('Rolling - JJ Cale',2,30, position='top')
-    vik.add_text_overlay('Recorded Feb 17, 22 using Tascam 12!',2,10, font_size=30,mycolor='yellow')
-    vik.render_video_to('Rolling.mp4')
+    vik.add_audio_track (audiofile,peak_audio_point)
+    # vik.add_text_overlay('Rolling - JJ Cale',2,20, position='top')
+    # vik.add_text_overlay('Recorded Feb 17, 22 using Tascam 12!',2,10, font_size=30,mycolor='yellow')
+
+    vik.replace_green_screen_with_bkg_image(bkg_image)
+    vik.render_video_to(f'temp.mp4')
 
     # For iPhone vide with size 1920x1080 following needed to get correct aspect ratio
-    os.system ('ffmpeg -i Rolling.mp4 -c copy -aspect 9:16 Rolling2.mp4')
-
-    # https://www.geeksforgeeks.org/replace-green-screen-using-opencv-python/
-
+    os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {outputfile}')
 
 if __name__ == '__main__':
-    wip1()
+    main()
