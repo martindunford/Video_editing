@@ -85,7 +85,7 @@ class Viktor:
     def replace_green_screen_with_bkg_image(self,bkgimage_file):
         self.info (f'Replacing Green Screen with: {bkgimage_file}')
         background = ImageClip (bkgimage_file)
-        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=150, s=5)
+        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=120, s=5)
         self.all_video_clips.remove (self.complete_clip)
         self.all_video_clips.append (background)
         self.all_video_clips.append (masked_clip)
@@ -213,9 +213,10 @@ def main():
 
     video_file = f'{moviename}.mov'
     audiofile = f'{moviename}.wav'
-    bkg_image = 'Burren-Limestone.jpg'
+    # bkg_image = 'Burren-Limestone.jpg'
+    bkg_image = 'Charlize.jpeg'
     outputfile = f'{moviename}.mp4'
-    os.system(f'rm -f {temp.mp4} {outputfile}')
+    os.system(f'rm -f temp.mp4 {outputfile}')
 
     # ________________________
     vik = Viktor(video_file)
