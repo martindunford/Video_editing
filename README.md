@@ -10,7 +10,18 @@ To install pyaudio:
 ## Video editing in general
 ### Getting section of a video
 This will extract first 20s of Rolling.mov into test1.mov
- ` ffmpeg -ss 0 -to 20 -i Rolling.mov test1.mov`
+ ` ffmpeg -ss 0 -to 20 -i Rolling.mov -c copy test1.mov`
+
+To find the dimensions of video 
+
+`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 bad_moon.mov`
+
+`1920x1080`
+
+### Green screen stock! (Cool)
+https://greenscreenstock.com/video-footage/military/
+
+https://www.shutterstock.com/video/search/green+screen?kw=green%20screen%20stock%20footage&c3apidt=p15784502820&gclid=CjwKCAiA6seQBhAfEiwAvPqu19dU6bmicD54ddUrGnqys44S5Hi710S8jeFxZ1XS0q_0kJSWUUPtLBoC3AQQAvD_BwE&gclsrc=aw.ds
 
 ## Audio editing
 
@@ -29,3 +40,10 @@ This will extract first 20s of Rolling.mov into test1.mov
 `sips -x 1280 1080 Charlize.jpg `
 
 Existing size: Ctrl click on image file name in Finder and is in the info section
+or
+
+`sips -g pixelWidth -g pixelHeight bad_moon.jpg`
+
+So get a background image. 
+Crop and extract a region with movie aspect ratio, e.g 1920x1280 (1.84) for iPhone
+Resize it (Python PIL module) to these dimensions (1920x1280)

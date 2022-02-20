@@ -2,10 +2,14 @@
 
 # Import everything needed to edit video clips
 from moviepy.editor import *
+from PIL import Image
+
 from setup_logger import *
 from sound_library import *
 import tempfile
 import time
+import os.path
+import argparse
 
 
 class Viktor:
@@ -90,15 +94,40 @@ class Viktor:
         self.all_video_clips.append (background)
         self.all_video_clips.append (masked_clip)
 
+    def replace_green_screen_with_bkg_video(self,bkgvideo_file):
+        self.info (f'Replacing Green Screen with: {bkgvideo_file}')
+        background = VideoFileClip (bkgvideo_file)
+        background.set_position ((0,0))
+        logger.info (f'Background video size: {background.size}')
+        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=120, s=5)
+        self.all_video_clips.remove (self.complete_clip)
+        self.all_video_clips.append (background)
+        self.all_video_clips.append (masked_clip)
+
     # --------------------
     def render_video_to (self, output_file):
-        self.info (f'Rendering to: {output_file}')
+        self.info (f'Rendering to: temp.mp4')
         # Write the result to a file (many options available !)
         self.video.write_videofile(
-            output_file,
+            'temp.mp4',
             audio_codec='aac' # Should not be needed but there is bug.
         )
 
+        # For iPhone video with size 1920x1080 following needed to get correct aspect ratio
+        self.info (f'Ensuring Aspect Ratio correct (writing to {output_file}')
+        os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {output_file}')
+
+    # --------------------
+    def trim_video (self,start_time,end_time,ofile_name):
+        self.info (f'Extracting {start_time}:{end_time} from {self.video_file} into {ofile_name}')
+        tcmd = f'ffmpeg -ss {start_time} -to {end_time} -i {self.video_file} -c copy {ofile_name}'
+        os.system (tcmd)
+
+    # --------------------
+    def trim_audio (self,start_time,end_time,audio_file, ofile_name):
+        self.info (f'Extracting {start_time}:{end_time} from {audio_file} into {ofile_name}')
+        tcmd = f'sox  {audio_file}  {ofile_name} trim {start_time} {end_time} '
+        os.system (tcmd)
     # --------------------
     def info(self, msg):
         logger.info(f'{self.__class__.__name__}: {msg}')
@@ -208,29 +237,72 @@ def wip3():
             break
 
 def main():
-    # Assumes replace audio is in <fname>.wav
-    moviename = 'test1'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Debug mode')
+    parser.add_argument('-b', '--bimage',
+                        help='Replace green screen with an image')
+    parser.add_argument('-c', '--bvideo',
+                        help='Replace green screen with a video')
+    parser.add_argument('-a', '--audio',
+                        help='Replacement audio track (Note: both video and audio need an initial loud sync sound (e.g handclap_')
+    parser.add_argument('-v', '--video',
+                        help='Video file to be altered')
+    parser.add_argument('-t', '--trim',
+                        help='Only produce the first N seconds of video (save time to see if what was intended works!) ')
+    args = parser.parse_args()
 
-    video_file = f'{moviename}.mov'
-    audiofile = f'{moviename}.wav'
+    video_file = args.video
+    vik = Viktor(video_file)
+    outputfile = f'{os.path.basename(video_file).split(".")[0]}.mp4'
+
+    os.system ('rm trim.*')
+    if args.trim:
+        vik.trim_video (0,args.trim,'trim.mov')
+        vik = Viktor ('trim.mov')
+
+    # Tested and work
     # bkg_image = 'Burren-Limestone.jpg'
-    bkg_image = 'Charlize.jpeg'
-    outputfile = f'{moviename}.mp4'
-    os.system(f'rm -f temp.mp4 {outputfile}')
+    # bkg_image = 'bad_moon1_resized.png'
+    # bkg_video = 'wild_weather.mov'
+
+    os.system(f'rm -f {outputfile} temp.mp4')
 
     # ________________________
-    vik = Viktor(video_file)
-    peak_audio_point,sample_rate = vik.find_peak_audio_amplitude ()
+    if args.audio:
+        audiofile = args.audio
+        if args.trim:
+            vik.trim_audio (0,args.trim,audiofile,'trim.wav')
+            audiofile = 'trim.wav'
 
-    vik.add_audio_track (audiofile,peak_audio_point)
+        peak_audio_point,_ = vik.find_peak_audio_amplitude ()
+        vik.add_audio_track (audiofile,peak_audio_point)
+
+    # TODO:
     # vik.add_text_overlay('Rolling - JJ Cale',2,20, position='top')
     # vik.add_text_overlay('Recorded Feb 17, 22 using Tascam 12!',2,10, font_size=30,mycolor='yellow')
 
-    vik.replace_green_screen_with_bkg_image(bkg_image)
-    vik.render_video_to(f'temp.mp4')
+    if args.bimage:
+        vik.replace_green_screen_with_bkg_image(args.bimage)
+    if args.bvideo:
+        vik.replace_green_screen_with_bkg_video(args.bvideo)
+    vik.render_video_to(outputfile)
 
-    # For iPhone vide with size 1920x1080 following needed to get correct aspect ratio
-    os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {outputfile}')
+
+def resize_image (image, new_size):
+    '''
+    Resize and image
+    :param image: Name of image file
+    :param new_size: A tuple (width, height)
+    :return: 
+    '''
+    b_image = Image.open(image)
+    logger.info (f'Background image has size: {b_image.height} x {b_image.width}')
+    b_image = b_image.resize(new_size)
+
+
+    b_image.save (f'{image.split(".")[0]}_resized.png')
 
 if __name__ == '__main__':
     main()
+    # resize_image ('bad_moon1.png',(1280,1920))
