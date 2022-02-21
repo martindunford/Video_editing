@@ -19,10 +19,17 @@ class Viktor:
     def __init__ (self,video_file):
         self.video_file = video_file
         self.complete_clip = VideoFileClip(self.video_file)
+        self.duration = self.complete_clip.duration
+
         logger.info (f'Original Clip size is: {self.complete_clip.size}')
         self.original_audio = self.complete_clip.audio
         self.all_video_clips = [self.complete_clip]
         self.video = CompositeVideoClip(self.all_video_clips)
+
+        self.find_peak_audio_amplitude()
+
+        # The output video to start 2 seconds after hand clap
+        self.video.set_start(self.peak_audio+2)
 
     # --------------------
     def find_peak_audio_amplitude(self):
@@ -37,12 +44,10 @@ class Viktor:
 
     # --------------------
     def add_audio_track (self, audio_file, insert_at, replace_original_audio=True):
-        if not self.sample_rate:
-            self.find_peak_audio_amplitude()
-
         insert_file_peak_audio,_ = find_peak(audio_file)
+        insert_file_peak_audio = 1.4067
         self.info (f'Found audio peak for {audio_file} at: {insert_file_peak_audio} seconds')
-        insert_at = self.peak_audio - insert_file_peak_audio
+        insert_at = round (self.peak_audio - insert_file_peak_audio,4)
 
         if replace_original_audio:
             self.info (f'Replacing audio (for {self.video_file}) starting at: {insert_at} seconds with audio from {audio_file}')
@@ -89,30 +94,51 @@ class Viktor:
     def replace_green_screen_with_bkg_image(self,bkgimage_file):
         self.info (f'Replacing Green Screen with: {bkgimage_file}')
         background = ImageClip (bkgimage_file)
+        # Note: Digital Color Meter app (OX-X) to get closest RGB for color of the green screen
         masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=120, s=5)
+
+        # We don't want the original clip just the new masked one and the backgrond video
+        #  in the masked portion of same
         self.all_video_clips.remove (self.complete_clip)
         self.all_video_clips.append (background)
-        self.all_video_clips.append (masked_clip)
+        # We only want video after the detected hand clap/sync sound !!
+        self.all_video_clips.append (masked_clip.subclip(self.peak_audio+2,self.duration))
 
     def replace_green_screen_with_bkg_video(self,bkgvideo_file):
         self.info (f'Replacing Green Screen with: {bkgvideo_file}')
         background = VideoFileClip (bkgvideo_file)
-        background.set_position ((0,0))
+        # background.set_position ((0,0))
         logger.info (f'Background video size: {background.size}')
+
+        number_of_clips = self.video.duration//background.duration
+        self.info (f'Will need to concatenate background video {number_of_clips} times!')
+        clips = int(number_of_clips)*[background]
+        background1 = concatenate_videoclips(clips,
+                                            method="compose")
+
+        # Note: Digital Color Meter app (OX-X) to get closest RGB for color of the green screen
         masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=120, s=5)
+
+        # We don't want the original clip just the new masked one and the backgrond video
+        #  in the masked portion of same
         self.all_video_clips.remove (self.complete_clip)
-        self.all_video_clips.append (background)
+        self.all_video_clips.append (background1)
+        # We only want video after the detected hand clap/sync sound !!
         self.all_video_clips.append (masked_clip)
 
     # --------------------
-    def render_video_to (self, output_file):
+    def render_video_to (self, output_file, subclip=None):
         self.info (f'Rendering to: temp.mp4')
         # Write the result to a file (many options available !)
+
+        if subclip:
+            self.info (f'Extracting subclip from {subclip[0]} to {subclip[1]}')
+            self.video = self.video.subclip(t_start=subclip[0],
+                                            t_end=subclip[1])
         self.video.write_videofile(
             'temp.mp4',
             audio_codec='aac' # Should not be needed but there is bug.
         )
-
         # For iPhone video with size 1920x1080 following needed to get correct aspect ratio
         self.info (f'Ensuring Aspect Ratio correct (writing to {output_file}')
         os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {output_file}')
@@ -132,114 +158,38 @@ class Viktor:
     def info(self, msg):
         logger.info(f'{self.__class__.__name__}: {msg}')
 
-import cv2
-import numpy as np
-
-def replace_green():
-    ofile = cv2.VideoWriter('outpy.mp4',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (1280,1080))
-    video = cv2.VideoCapture("Rolling.mov")
-    image = cv2.imread("Burren-Limestone.jpg")
-    image = cv2.resize (image,(1280, 1080))
-
-    while True:
-        ret, frame = video.read()
-
-        if ret:
-            frame = cv2.resize(frame, (1280, 1080))
-
-            # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
-            u_green = np.array([200, 248, 80])
-            l_green = np.array([30, 50, 0])
-
-            mask = cv2.inRange(frame, l_green, u_green)
-            # mask = create_mask_with_threshold(frame)
-            res = cv2.bitwise_and(frame, frame, mask = mask)
-
-            f = frame - res
-            f = np.where(f == 0, image, f)
-            # cv2.imshow("video", frame)
-            # cv2.imshow("mask", f)
-
-            ofile.write(f)
-
-            # Press Q on keyboard to stop processing
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        else:
-            # Last frame read
-            break
-
-    video.release()
-    cv2.destroyAllWindows()
-
-def create_mask_with_threshold(frame):
-    # split the the B, G and R channels
-    b, g, r = cv2.split(frame)
-
-    # create the threshold
-    _, mask = cv2.threshold(g, 200, 50, cv2.THRESH_BINARY_INV)
-
-    # De-noise the threshold to get a cleaner mask
-    mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)))
-
-    return mask
-
-
-def replace_background(frame, bg, mask):
-    # if the pixel on threshold is background then make it white
-    frame[mask == 0] = 255
-
-    # if the pixel on threshold is not background then make it black
-    bg[mask != 0] = 255
-
-    # combine both images into frame
-    return cv2.bitwise_and(bg, frame)
 
 def wip1():
-    replace_green()
+    video_file = 'temp1.mov'
+    complete_clip = VideoFileClip(video_file)
+
+    logger.info (f'Original Clip size is: {complete_clip.size}')
+    all_video_clips = [complete_clip]
+    video = CompositeVideoClip(all_video_clips)
+    video1 = video.subclip(10,15)
+    video1.write_videofile(
+        'temp1.mp4',
+        audio_codec='aac' # Should not be needed but there is bug.
+    )
 
 def wip2():
-    image = cv2.imread("Burren-Limestone.jpg")
+    video_file = 'wild_weather.mov'
+    clip1 = VideoFileClip(video_file)
+    newclip1 = concatenate_videoclips (2*[clip1])
 
-    image = cv2.resize(image, (1280, 1080))
-    cv2.imshow("video", image)
-
-    while 1:
-        if cv2.waitKey(25) == 27:
-            break
-
-def wip3():
-    video = cv2.VideoCapture("Rolling.mov")
-    image = cv2.imread("Burren-Limestone.jpg")
-
-    ret, frame = video.read()
-
-    frame = cv2.resize(frame, (1280, 1080))
-    image = cv2.resize(image, (1280, 1080))
-
-
-    # OpenCV usually captures images and videos in 8-bit, unsigned integer, BGR forma
-    u_green = np.array([200, 248, 70])
-    l_green = np.array([30, 70, 0])
-
-    mask = cv2.inRange(frame, l_green, u_green)
-    # mask = create_mask_with_threshold(frame)
-    res = cv2.bitwise_and(frame, frame, mask = mask)
-
-    f = frame - res
-    f = np.where(f == 0, image, f)
-
-    cv2.imshow("video", frame)
-    cv2.imshow("mask", f)
-
-    while 1:
-        if cv2.waitKey(25) == 27:
-            break
+    all_video_clips = [newclip1]
+    video1 = CompositeVideoClip(all_video_clips)
+    video1.write_videofile(
+        'temp1.mp4',
+        audio_codec='aac' # Should not be needed but there is bug.
+    )
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Debug mode')
+    parser.add_argument( '--clap', action='store_true',
+                        help='Output video contains clap. Default is it starts 2 seconds after point of hand clap used to sync with audio')
     parser.add_argument('-b', '--bimage',
                         help='Replace green screen with an image')
     parser.add_argument('-c', '--bvideo',
@@ -256,11 +206,6 @@ def main():
     vik = Viktor(video_file)
     outputfile = f'{os.path.basename(video_file).split(".")[0]}.mp4'
 
-    os.system ('rm trim.*')
-    if args.trim:
-        vik.trim_video (0,args.trim,'trim.mov')
-        vik = Viktor ('trim.mov')
-
     # Tested and work
     # bkg_image = 'Burren-Limestone.jpg'
     # bkg_image = 'bad_moon1_resized.png'
@@ -271,10 +216,6 @@ def main():
     # ________________________
     if args.audio:
         audiofile = args.audio
-        if args.trim:
-            vik.trim_audio (0,args.trim,audiofile,'trim.wav')
-            audiofile = 'trim.wav'
-
         peak_audio_point,_ = vik.find_peak_audio_amplitude ()
         vik.add_audio_track (audiofile,peak_audio_point)
 
@@ -284,24 +225,18 @@ def main():
 
     if args.bimage:
         vik.replace_green_screen_with_bkg_image(args.bimage)
-    if args.bvideo:
+    elif args.bvideo:
         vik.replace_green_screen_with_bkg_video(args.bvideo)
-    vik.render_video_to(outputfile)
 
+    # From 2 seconds past hand clap to the end
+    subclip=(vik.peak_audio+2,None)
+    if args.clap:
+        subclip = None
+        logger.info (f'subclap = {subclip}')
+    vik.render_video_to(outputfile,
+                        subclip=subclip
+                        )
 
-def resize_image (image, new_size):
-    '''
-    Resize and image
-    :param image: Name of image file
-    :param new_size: A tuple (width, height)
-    :return: 
-    '''
-    b_image = Image.open(image)
-    logger.info (f'Background image has size: {b_image.height} x {b_image.width}')
-    b_image = b_image.resize(new_size)
-
-
-    b_image.save (f'{image.split(".")[0]}_resized.png')
 
 if __name__ == '__main__':
     main()
