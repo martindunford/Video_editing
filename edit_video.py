@@ -22,6 +22,7 @@ class Viktor:
         self.duration = self.complete_clip.duration
 
         logger.info (f'Original Clip size is: {self.complete_clip.size}')
+        self.original_size = self.complete_clip.size
         self.original_audio = self.complete_clip.audio
         self.all_video_clips = [self.complete_clip]
         self.video = CompositeVideoClip(self.all_video_clips)
@@ -33,21 +34,28 @@ class Viktor:
 
     # --------------------
     def find_peak_audio_amplitude(self):
-        tf = tempfile.NamedTemporaryFile(suffix='.wav')
-        self.info (f'Extracting audio track for Movie {self.video_file} into {tf.name}')
-        self.complete_clip.audio.write_audiofile(tf.name)
+        if self.complete_clip.audio:
+            tf = tempfile.NamedTemporaryFile(suffix='.wav')
+            self.info (f'Extracting audio track for Movie {self.video_file} into {tf.name}')
+            self.complete_clip.audio.write_audiofile(tf.name)
 
-        self.peak_audio,self.sample_rate = find_peak (tf.name)
-        self.info (f'Found audio peak for {self.video_file} at: {self.peak_audio} seconds')
+            self.peak_audio,self.sample_rate = find_peak (tf.name)
+            self.info (f'Found audio peak for {self.video_file} at: {self.peak_audio} seconds')
 
-        return self.peak_audio, self.sample_rate
+            return self.peak_audio, self.sample_rate
+        else:
+            self.peak_audio, self.sample_rate = 0,48000
+            return 0,48000 # No sound track
 
     # --------------------
     def add_audio_track (self, audio_file, insert_at, replace_original_audio=True):
-        insert_file_peak_audio,_ = find_peak(audio_file)
-        insert_file_peak_audio = 1.4067
-        self.info (f'Found audio peak for {audio_file} at: {insert_file_peak_audio} seconds')
-        insert_at = round (self.peak_audio - insert_file_peak_audio,4)
+        if self.peak_audio: # Video has an existing sound track
+            insert_file_peak_audio,_ = find_peak(audio_file)
+            self.info (f'Found audio peak for {audio_file} at: {insert_file_peak_audio} seconds')
+
+            insert_at = round (self.peak_audio - insert_file_peak_audio,4)
+        else:
+            insert_at = 0
 
         if replace_original_audio:
             self.info (f'Replacing audio (for {self.video_file}) starting at: {insert_at} seconds with audio from {audio_file}')
@@ -110,14 +118,17 @@ class Viktor:
         # background.set_position ((0,0))
         logger.info (f'Background video size: {background.size}')
 
-        number_of_clips = self.video.duration//background.duration
+        number_of_clips = max (1,self.video.duration//background.duration)
         self.info (f'Will need to concatenate background video {number_of_clips} times!')
-        clips = int(number_of_clips)*[background]
-        background1 = concatenate_videoclips(clips,
-                                            method="compose")
+        if number_of_clips > 1:
+            clips = int(number_of_clips)*[background]
+            background1 = concatenate_videoclips(clips,
+                                                method="compose")
+        else:
+            background1 = background
 
         # Note: Digital Color Meter app (OX-X) to get closest RGB for color of the green screen
-        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 206, 128], thr=120, s=5)
+        masked_clip = self.complete_clip.fx(vfx.mask_color, color=[0, 246, 57], thr=170, s=5)
 
         # We don't want the original clip just the new masked one and the backgrond video
         #  in the masked portion of same
@@ -135,13 +146,18 @@ class Viktor:
             self.info (f'Extracting subclip from {subclip[0]} to {subclip[1]}')
             self.video = self.video.subclip(t_start=subclip[0],
                                             t_end=subclip[1])
+
+        logger.info (f'Final size is: {self.video.size}')
+
         self.video.write_videofile(
             'temp.mp4',
             audio_codec='aac' # Should not be needed but there is bug.
         )
-        # For iPhone video with size 1920x1080 following needed to get correct aspect ratio
-        self.info (f'Ensuring Aspect Ratio correct (writing to {output_file}')
-        os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {output_file}')
+
+        if list(self.video.size) != list(self.original_size):
+            # For iPhone video with size 1920x1080 following needed to get correct aspect ratio
+            self.info (f'Ensuring Aspect Ratio correct (writing to {output_file}')
+            os.system (f'ffmpeg -i temp.mp4 -c copy -aspect 9:16 {output_file}')
 
     # --------------------
     def trim_video (self,start_time,end_time,ofile_name):

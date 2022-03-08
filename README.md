@@ -10,7 +10,13 @@ To install pyaudio:
 ## Video editing in general
 ### Getting section of a video
 This will extract first 20s of Rolling.mov into test1.mov
+
  ` ffmpeg -ss 0 -to 20 -i Rolling.mov -c copy test1.mov`
+
+Combine several videos into one 
+
+`ls video1.mp4 video2.mp4 | while read line; do echo file \'$line\'; done | ffmpeg -protocol_whitelist file,pipe -f concat -i - -c copy output.mp4
+`
 
 To find the dimensions of video 
 
