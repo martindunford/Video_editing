@@ -1,6 +1,10 @@
 # Video Editing Application overview 
 Replace and add audio tracks of videos and add text overlays etc
 
+Note that using VENY python3.11 from now on (after Version_1.0 (git tag))
+and that an intuitive **video_commander.py** Application is the first stop
+to easily get the results you desire
+
 ## Required module notes
 To install pyaudio:
 
