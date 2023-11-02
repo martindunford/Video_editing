@@ -13,6 +13,7 @@ MarkupSafe==2.1.3
 mdurl==0.1.2
 moviepy==1.0.3
 numpy==1.26.1
+opencv-python==4.8.1.78
 pfzy==0.3.4
 Pillow==10.0.1
 proglog==0.1.10

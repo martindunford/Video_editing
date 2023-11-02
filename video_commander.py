@@ -1,9 +1,4 @@
 #! .venv/bin/python3
-# -*- coding: utf-8 -*-
-"""
-list prompt example
-"""
-# from __future__ import print_function, unicode_literals
 
 import subprocess
 import shlex
@@ -29,7 +24,7 @@ import ffmpeg
 # Import everything needed to edit video clips
 from moviepy.editor import *
 from moviepy.video.fx.all import *
-
+from moviepy.video.tools.drawing import circle
 
 tasks = [
     f'{target} Get Clip size',
@@ -43,10 +38,14 @@ tasks = [
     Separator(),
     f'{green_book} Moviepy Effects Documentation',
     Separator(),
+    f'{cactus} Work In Progress',
     Choice(value=None, name="Exit"),
 ]
 
 # =====================================================================
+
+def simple_motion(t):
+    return 100+t*50,100+t*50,
 def video_commander ():
     os.system ('clear')
     print ('')
@@ -125,6 +124,7 @@ def video_commander ():
 
         clip2_small = clip2.resize(0.25)
         clip3 = VideoFileClip('Video_clips/the_finger.mp4')
+        # clip3.set_position (simple_motion)
         clip3_small = clip3.resize(0.16)
         clip3_silent = clip3_small.without_audio()
         output_file = f'Stacked_1.mp4'
@@ -148,6 +148,42 @@ def video_commander ():
 
     elif 'Moviepy Effects Documentation' in task:
         os.system (f'open https://zulko.github.io/moviepy/ref/videofx/moviepy.video.fx.all.crop.html')
+
+    elif 'Work In Progress' in task:
+        # Rendered video from AE with RGB+Alpha
+        mask = VideoFileClip("blueBox.mov", has_mask=True).mask
+        video1 = TextClip("Hello world", fontsize=100, color="red", font="EndzoneTechCond-Bold.otf")
+        # Created blank video for the background layer
+        video2 = VideoFileClip("blackBox.mov")
+        # Place the video1 on top of video2 while also applying the mask to video1.
+        final_video = CompositeVideoClip([video2, video1.set_mask(mask)])
+        # you could remove the audio information but I just copied this from an older file so I left it on
+        final_video.set_duration(10).write_videofile("maskingTest.mp4", fps=30, codec='mpeg4', bitrate="4000k",
+                                                     audio_codec="mp3")
+        return
+        vchoices = glob.glob('**/*.mov') + glob.glob('**/*.mp4')
+        input_file =  iterfzf(vchoices,multi=False)
+        output_file = f'{os.path.basename(input_file)}_1.mp4'
+
+        clip = VideoFileClip(input_file, audio=False).add_mask()
+        w, h = clip.size
+        logger.info (f'Clip dimensions are Height:{h}, Width:{w}')
+
+        # The mask is a circle with vanishing radius r(t) = 800-100*t
+        clip.mask.get_frame = lambda t: circle(screensize=(clip.w, clip.h),
+                                               center=(clip.w/2, clip.h/4),
+                                               radius=max(0, int(800 - 50*t)),
+                                               col1=1, col2=0, blur=4)
+
+        the_end = TextClip("The End", font="Amiri-bold", color="white",
+                           fontsize=70).set_duration(clip.duration)
+
+        final = CompositeVideoClip([the_end.set_pos('center'), clip],
+                                   size=clip.size)
+
+        final.write_videofile(output_file)
+
+
 
     else:
         logger.error (f'No matchng actions found for task: {task}')
