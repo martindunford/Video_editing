@@ -1,4 +1,4 @@
-#! /Users/martin/VENVS/py3.11/bin/python3
+#! .venv/bin/python3
 # -*- coding: utf-8 -*-
 """
 list prompt example
@@ -28,15 +28,20 @@ import ffmpeg
 
 # Import everything needed to edit video clips
 from moviepy.editor import *
+from moviepy.video.fx.all import *
 
 
 tasks = [
+    f'{target} Get Clip size',
+    f'{target} Crop Clip down to (x1,y1) to (x2,y2)',
     f'{target} Extract segment of Clip (any .mov or .mp4 in current directory tree) into another clip',
     f'{target} Speed up or slow down a Video Clip',
+    Separator(),
     f'{target} Combine many clips',
     f'{target} Stack two clips',
     f'{target} Composite clip',
-
+    Separator(),
+    f'{green_book} Moviepy Effects Documentation',
     Separator(),
     Choice(value=None, name="Exit"),
 ]
@@ -54,8 +59,28 @@ def video_commander ():
     ).execute()
     if not task: return
 
+    if 'Get Clip size' in task:
+        vchoices = glob.glob('**/*.mov') + glob.glob('**/*.mp4')
+        input_file =  iterfzf(vchoices,multi=False)
+        clip1 = VideoFileClip(input_file)
+        logger.info (clip1.size)
 
-    if 'Extract segment of Clip' in task:
+    elif  'Crop Clip down to' in task:
+        vchoices = glob.glob('**/*.mov') + glob.glob('**/*.mp4')
+        input_file =  iterfzf(vchoices,multi=False)
+        output_file = f'{os.path.basename(input_file)}_1.mp4'
+
+        clip1 = VideoFileClip(input_file)
+        top_left = input ('Co-ordinates for top left (x,y)?:')
+        bottom_right = input('Co-ordinates for bottom right (x,y)?:')
+        x1,y1 = top_left.split(',')
+        x2,y2 = bottom_right.split(',')
+        clip1_cropped = crop(clip1, x1,y1,x2,y2)
+
+        clip1_cropped.write_videofile(output_file, audio_codec="aac")
+
+
+    elif 'Extract segment of Clip' in task:
         start = float(input ('Start point (seconds) of new clip?:'))
         end  = float(input ('End point (seconds) of new clip?:'))
 
@@ -94,7 +119,7 @@ def video_commander ():
         vchoices = glob.glob('**/*.mov') + glob.glob('**/*.mp4')
         # file1, file2 = iterfzf(vchoices, multi=True)
         file1 = 'Video_clips/camp_footage.mov_1.mp4'
-        file2 = 'Video_clips/commentary.mov_1.mp4'
+        file2 = 'Video_clips/commentary.mp4'
         clip1 = VideoFileClip(file1)
         clip2 = VideoFileClip(file2)
 
@@ -120,6 +145,12 @@ def video_commander ():
             final_clip.write_videofile(output_file, audio_codec="aac")
         else:
             final_clip.write_videofile(output_file)
+
+    elif 'Moviepy Effects Documentation' in task:
+        os.system (f'open https://zulko.github.io/moviepy/ref/videofx/moviepy.video.fx.all.crop.html')
+
+    else:
+        logger.error (f'No matchng actions found for task: {task}')
 
 
 
